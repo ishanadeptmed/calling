@@ -1,0 +1,6 @@
+pandas #==2.2.2 
+python-dotenv #==1.0.1 #for loading environment variables
+supabase #==2.12.0
+numpy #==2.2.0
+mypy #==1.15.0 #static type checking
+streamlit #==1.25.0 #for building the dashboard pages
