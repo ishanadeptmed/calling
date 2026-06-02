@@ -1,160 +1,43 @@
 import streamlit as st
-import json
-
-from supabase_client import supabase
-
-from utils.storage_helpers import (
-    load_care_level_rates,
-    load_dataframe_from_storage
-)
-
-from utils.transform_data import (
-    get_unique_care_levels
-)
-
+import utils.transform_data as backbone
 
 def app(go):
-
-    st.title("Rates Configuration")
+    st.title("Care Level Rates")
 
     facility = st.session_state.get("facility")
+    attendance_path = st.session_state.get("attendance_path")
 
-    if not facility:
-        st.error("No facility selected")
+    if not facility or not attendance_path:
+        st.error("Missing facility configuration environment parameters.")
         return
 
-    attendance_path = st.session_state.get(
-        "attendance_path"
-    )
+    # Let backbone prepare the session state arrays
+    backbone.initialize_care_levels_state(facility, attendance_path)
 
-    if not attendance_path:
-        st.error("Attendance file missing")
-        return
+    st.subheader("Configure Care Level Rates")
 
-    # =====================================
-    # LOAD ATTENDANCE
-    # =====================================
-
-    attendance_df = load_dataframe_from_storage(
-        attendance_path
-    )
-
-    unique_levels = get_unique_care_levels(
-        attendance_df
-    )
-
-    # =====================================
-    # LOAD SAVED RATES
-    # =====================================
-
-    existing_rates = load_care_level_rates(
-        facility
-    )
-
-    # =====================================
-    # INITIALIZE SESSION STATE
-    # =====================================
-
-    if "rate_rows" not in st.session_state:
-
-        st.session_state.rate_rows = []
-
-        for level in unique_levels:
-
-            st.session_state.rate_rows.append({
-                "care_level": level,
-                "cost": float(
-                    existing_rates.get(level, 0)
-                )
-            })
-
-    st.subheader("Care Level Rates")
-
-    # =====================================
-    # EDITABLE TABLE
-    # =====================================
-
-    for i, row in enumerate(
-        st.session_state.rate_rows
-    ):
-
-        col1, col2, col3 = st.columns(
-            [3, 2, 1]
-        )
-
+    for i, row in enumerate(st.session_state.care_rows):
+        col1, col2, col3 = st.columns([3, 2, 1])
         with col1:
-
-            row["care_level"] = st.text_input(
-                f"Care Level {i}",
-                value=row["care_level"],
-                key=f"care_{i}"
-            )
-
+            row["care_level"] = st.text_input("Care Level", value=row["care_level"], key=f"care_{i}")
         with col2:
-
-            row["cost"] = st.number_input(
-                f"Cost {i}",
-                value=float(row["cost"]),
-                step=1.0,
-                key=f"cost_{i}"
-            )
-
+            row["cost"] = st.number_input("Cost", value=float(row["cost"]), step=0.01, key=f"cost_{i}")
         with col3:
-
-            if st.button(
-                "Delete",
-                key=f"delete_{i}"
-            ):
-
-                st.session_state.rate_rows.pop(i)
-
+            if st.button("Delete", key=f"delete_{i}"):
+                st.session_state.care_rows.pop(i)
                 st.rerun()
 
-    # =====================================
-    # ADD ROW
-    # =====================================
-
     if st.button("Add Care Level"):
-
-        st.session_state.rate_rows.append({
-            "care_level": "",
-            "cost": 0
-        })
-
+        st.session_state.care_rows.append({"care_level": "", "cost": 0.0})
         st.rerun()
 
     st.divider()
 
-    # =====================================
-    # SAVE
-    # =====================================
-
     if st.button("Save Rates"):
-
-        rates_data = st.session_state.rate_rows
-
-        json_data = json.dumps(
-            rates_data,
-            indent=4
-        )
-
-        file_path = (
-            f"{facility}/rates/"
-            "care_level_rates.json"
-        )
-
-        supabase.storage.from_(
-            "facility-data"
-        ).upload(
-            path=file_path,
-            file=json_data.encode("utf-8"),
-            file_options={
-                "upsert": "true"
-            }
-        )
-
-        st.success(
-            "Rates saved successfully"
-        )
-
-        go("payer_rates")
+        try:
+            # Send current data straight back to backbone for cloud persistence
+            backbone.save_care_level_rates_to_db(facility, st.session_state.care_rows)
+            st.success("Care level rates saved by Backbone!")
+            go("payer_rates")
+        except Exception as e:
+            st.error(f"Save action rejected by backbone process: {e}")

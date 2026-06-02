@@ -53,5 +53,6 @@ def app(go):
         if st.button("Continue"):
 
             st.session_state.facility = selected
+            st.session_state.facility_path = f"{user_email}/{selected}"
 
             go("upload")

@@ -1,7 +1,7 @@
 import streamlit as st
-from utils.transform_data import (
-    process_facility_attendance
-)
+from utils.transform_data import process_facility_attendance
+# Import the native Streamlit dashboard utility component
+from utils.dashboards import render_review_dashboard
 
 def app(go):
 
@@ -19,7 +19,7 @@ def app(go):
         return
 
     # =========================================
-    # PROCESS FINAL DATA
+    # 1. PROCESS FINAL DATA
     # =========================================
 
     final_df = process_facility_attendance(
@@ -27,13 +27,16 @@ def app(go):
         attendance_file_path=attendance_path
     )
 
-    # preview
+    # =========================================
+    # 2. PROCESSED DATA PREVIEW TABLE (TOP)
+    # =========================================
+
     st.subheader("Processed Data Preview")
 
     st.dataframe(final_df)
 
     # =========================================
-    # DOWNLOAD CSV
+    # 3. DOWNLOAD CSV ACTIONS
     # =========================================
 
     csv_data = final_df.to_csv(
@@ -48,9 +51,16 @@ def app(go):
     )
 
     # =========================================
-    # RESTART
+    # 4. PERFORMANCE DASHBOARD VISUALS (SCROLL DOWN)
+    # =========================================
+    # Moved here so it renders underneath your main data assets
+    render_review_dashboard(final_df)
+
+    # =========================================
+    # 5. RESTART ACTION
     # =========================================
 
+    st.write("##") # Spacer before the restart utility
     if st.button("Restart"):
         st.session_state.clear()
         go("login")
