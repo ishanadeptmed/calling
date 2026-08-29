@@ -194,9 +194,8 @@ def process_facility_attendance(facility: str, attendance_file_path: str) -> pd.
     df["Adjustment_Percent"] = df["_payer_key"].map(payer_adjustments).fillna(0.0)
     
     # 9. Calculate Financial Columns
-    df["Total_Cost"] = df["TotalDays"] * df["Base_Cost"]
     df["Final_Cost"] = df["Base_Cost"] * df["Adjustment_Percent"]
-
+    df["Total_Cost"] = df["TotalDays"] * df["Final_Cost"]
     # =========================================================
     # INJECT EXPLICIT SELECTION PARAMETERS FOR DASHBOARD TRACKING
     # =========================================================
