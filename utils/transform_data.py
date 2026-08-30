@@ -127,6 +127,22 @@ def save_payer_rates_to_db(facility: str, payer_rows: list):
 
 
 # =========================================================
+# EXPORT FORMATTING (Called at end of process_facility_attendance)
+# =========================================================
+
+COST_COLUMNS = ["Final_Cost", "Total_Cost"]
+
+
+def round_cost_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Round Final_Cost and Total_Cost to 2 decimals while keeping numeric dtypes."""
+    out = df.copy()
+    for col in COST_COLUMNS:
+        if col in out.columns:
+            out[col] = pd.to_numeric(out[col], errors="coerce").round(2)
+    return out
+
+
+# =========================================================
 # CORE PROCESSING ENGINE (Called by review_download.py)
 # =========================================================
 
@@ -207,5 +223,8 @@ def process_facility_attendance(facility: str, attendance_file_path: str) -> pd.
     drop_operational = ["_care_key", "_payer_key"]
     final_clean_cols = [col for col in drop_operational if col in df.columns]
     df = df.drop(columns=final_clean_cols)
+
+    # 11. Round cost columns as numeric floats immediately before return/export
+    df = round_cost_columns(df)
 
     return df
