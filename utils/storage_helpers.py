@@ -1,7 +1,8 @@
 import json
 from io import BytesIO
-from typing import Dict
+from typing import Dict, Tuple
 
+import duckdb
 import pandas as pd
 
 from supabase_client import supabase
@@ -21,28 +22,39 @@ def download_file_from_supabase(path: str) -> bytes:
 
 
 # =========================================================
-# LOAD DATAFRAME
+# LOAD DATAFRAME  (returns an in-memory DuckDB relation)
 # =========================================================
 
-def load_dataframe_from_storage(path: str) -> pd.DataFrame:
+def new_connection() -> duckdb.DuckDBPyConnection:
+    """Returns a fresh ephemeral in-memory DuckDB connection."""
+    return duckdb.connect()
 
+
+def load_dataframe_from_storage(path: str) -> Tuple[duckdb.DuckDBPyConnection, duckdb.DuckDBPyRelation]:
+    """
+    Downloads a file from Supabase and returns ``(con, relation)``.
+
+    Callers must hold a reference to *con* for the relation to stay alive:
+
+    - .csv  → read directly by DuckDB (zero pandas touch)
+    - .xlsx → read by pandas (DuckDB has no Excel reader), then registered
+              as an in-memory DuckDB table so all downstream callers get a
+              consistent DuckDBPyRelation regardless of source format.
+    """
     file_bytes = download_file_from_supabase(path)
+    con = duckdb.connect()  # ephemeral, in-memory connection
 
     if path.endswith(".csv"):
-
-        return pd.read_csv(
-            BytesIO(file_bytes),
-            encoding="utf-8-sig"
-        )
+        rel = con.read_csv(BytesIO(file_bytes), encoding="UTF-8")
+        return con, rel
 
     elif path.endswith(".xlsx"):
-
-        return pd.read_excel(
-            BytesIO(file_bytes)
-        )
+        df = pd.read_excel(BytesIO(file_bytes))
+        con.register("_excel_tmp", df)
+        return con, con.table("_excel_tmp")
 
     else:
-        raise ValueError("Unsupported file")
+        raise ValueError(f"Unsupported file format: {path}")
 
 
 # =========================================================
